@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Web3Auth AA tst dApp</title>
+    
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <div class="container">
+      <h1 class="title"><a target="_blank" href="http://web3auth.io/">Web3Auth</a> & AA</h1>
+      <!-- Logged In -->
+      <div class="grid btn-logged-in">
+        <button id="get-user-info" class="btn">Get User Info</button>
+        <button id="get-accounts" class="btn">Get Accounts</button>
+        <button id="get-balance" class="btn">Get Balance</button>
+        <button id="sign-message" class="btn">Sign Message</button>
+        <button id="send-transaction" class="btn">Send Transaction</button>
+        <b>Create request</b><br/>
+        Type: <select id="req-bill-type">
+          <option value="bill">bill</option>
+          <option value="invoice">invoice</option>
+          <option value="receipt">receipt</option>
+          <option value="refund">refund</option>
+        </select><br/>
+        IPFS: <input type="text" size="50" id="req-ipfs-hash" value="QmRAQB6YaCyidP37UdDnjFY5vQuiBrcqdyoW1CuDgwxkD4"/><br/>
+        From: your address<br/>
+        To: <input type="text" size="50" id="req-to-addr"  value="addr here..."/><br/>
+        Asset: <input type="text" size="50" id="req-asset" value="0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"/><br/>
+        Amount: <input type="text" size="50" id="req-amount" value="100000"/><br/>
+        <button id="create-request" class="btn">Create the bill</button>&nbsp;<button id="smartcreate-request" class="btn">Smart account create bill</button>
+        
+        <br/>&nbsp;<br/><span id="stat">Status ???</span><br/>&nbsp;<br/>&nbsp;<b>Interact request:</b><br/>
+        To: <input type="text" size="50" id="payreq-to-addr" value=""/><br/>
+        Amount: <input type="text" size="50" id="payreq-amount" value=""/><br/>
+        Linked Request address: <input type="text" size="50" id="payreq-reqaddress" value=""/><br/>
+        <button id="pay-request" class="btn">Pay that bill</button>&nbsp;<button id="smartpay-request" class="btn">Smart account pay bill</button>
+        <br/>&nbsp;<br/>
+        <button id="logout" class="btn">Logout</button>
+
+        <div class="console" id="console">
+          <p id="code" class="code"></p>
+        </div>
+      </div>
+
+      <!-- Logged Logout -->
+      <div class="grid btn-logged-out">
+        <button id="login" class="btn">Login</button>
+      </div>
+      <footer class="footer">
+        <a href="https://github.com/Web3Auth/Web3Auth/tree/master/examples/getting-started" target="_blank" rel="noopener noreferrer">
+          Source code
+        </a>
+      </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@web3auth/modal@latest/dist/modal.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@web3auth/openlogin-adapter@latest/dist/openloginAdapter.umd.min.js"></script>
+
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
+    <script src="./ABIs.js"></script>
+    <script src="./ethersRPC.js"></script>
+        
+    <script>
+      let web3auth = null;
+      let provider = null;
+      let openloginAdapter = null;
+      let smartAccount = null;
+      let eoa = null;
+      const currentW3AuthNetwork = "sapphire_devnet";
+      
+      async function set_UI_visibility()
+      {
+        let logged = false;
+        if (web3auth.provider && web3auth.connected) {
+            let accounts = await rpc.getAccounts(web3auth.provider);
+            if (accounts.length > 0)
+            {
+                logged = true;
+            }
+        }
+        
+        if (logged)
+        {
+            $(".btn-logged-in").show();
+            $(".btn-logged-out").hide();
+            /*if (web3auth.connectedAdapterName === "openlogin") {
+                $("#sign-tx").show();
+            }*/
+        } else
+        {
+            $(".btn-logged-out").show();
+            $(".btn-logged-in").hide();
+        }
+      }
+
+      (async function init() {
+        $(".btn-logged-in").hide();
+        $("#sign-tx").hide();
+
+        const clientId = "BJXIQATb6rWGj9R_OkQs4Vow-NJrN4X7SgTfdgpKf9tP0rPhXU_oDxQ-LGDSn_rNZ1yAoGry2ApYy-oWVex8HHA"; // get your clientId from https://dashboard.web3auth.io
+
+        web3auth = new window.Modal.Web3Auth({
+          clientId, 
+          web3AuthNetwork: currentW3AuthNetwork, // mainnet, aqua,  cyan or testnet
+          chainConfig: {
+            chainNamespace: "eip155",
+            chainId: chainID,
+            rpcTarget: RPCuri,
+          },
+        });
+        openloginAdapter = new window.OpenloginAdapter.OpenloginAdapter({
+          loginSettings: {
+            mfaLevel: "default", // Pass on the mfa level of your choice: default, optional, mandatory, none
+          },
+          adapterSettings: { 
+            loginConfig: {
+              // Add login configs corresponding to the provider
+              // Google login
+              google: {
+                name: "Google Login", // The desired name you want to show on the login button
+                verifier: "TestGoogleVerifier", // Please create a verifier on the developer dashboard and pass the name here
+                typeOfLogin: "google", // Pass on the login provider of the verifier you've created
+                clientId: "755949712907-f2r4kgo0rfrmokiscieucn755jvf16fu.apps.googleusercontent.com", // use your app client id you got from google
+              },
+              // Add other login providers here
+            }
+          },
+          web3AuthNetwork: currentW3AuthNetwork
+        });
+        web3auth.configureAdapter(openloginAdapter);
+        await web3auth.initModal();
+        await set_UI_visibility();
+      })();
+
+      $("#login").click(async function (event) {
+        try {
+    const web3authProvider = await web3auth.connect();
+          await set_UI_visibility();
+        } catch (error) {
+          console.error(error.message);
+        }
+      });
+
+      $("#get-user-info").click(async function (event) {
+        try {
+          const user = await web3auth.getUserInfo();
+          console.log(user);
+        } catch (error) {
+          console.error(error.message);
+        }
+      });
+
+      $("#logout").click(async function (event) {
+        try {
+          let a = web3auth.connected;
+          await web3auth.logout();
+          let b = web3auth.connected;
+          
+          set_UI_visibility();
+        } catch (error) {
+          console.error(error.message);
+        }
+      });
+
+      $("#get-accounts").click(async function (event) {
+        try {
+          const accounts = await rpc.getAccounts(web3auth.provider);
+          eoa = accounts;
+          console.log(accounts);
+          smartAccount = await rpc.getSmartAddress(web3auth.provider, accounts);
+          console.log(smartAccount);
+        } catch (error) {
+          console.error(error.message);
+        }
+      });
+
+      $("#get-balance").click(async function (event) {
+        try {
+          const balance = await rpc.getBalance(web3auth.provider);
+          console.log(balance);
+        } catch (error) {
+          console.error(error.message);
+        }
+      });
+
+      $("#send-transaction").click(async function (event) {
+        
+        try {
+
+          await rpc.mkUserOp(web3auth.provider, eoa, smartAccount);
+          
+        } catch (error) {
+          console.error(error.message);
+        }
+        
+      });
+
+
+      $("#sign-message").click(async function (event) {
+        try {
+          const signedMsg = await rpc.signMessage(web3auth.provider);
+          console.log(signedMsg);
+        } catch (error) {
+          console.error(error.message);
+        }
+      });
+
+      $("#get-private-key").click(async function (event) {
+        try {
+          const privateKey = await rpc.getPrivateKey(web3auth.provider);
+          console.log(privateKey);
+        } catch (error) {
+          console.error(error.message);
+        }
+      });
+
+      $("#create-request").click(async function (event) {
+      
+        try {
+          const accounts = await rpc.getAccounts(web3auth.provider);
+          eoa = accounts;
+          console.log("You are " + eoa);
+          const receipt = await rpc.mmCreateRequest(web3auth.provider,
+          document.getElementById("req-bill-type").value, 
+          document.getElementById("req-ipfs-hash").value,
+          eoa,
+          document.getElementById("req-to-addr").value,
+          document.getElementById("req-asset").value,
+          document.getElementById("req-amount").value);
+          console.log("Request creation tx hash: " + receipt);
+        } catch (error) {
+          console.error(error.message);
+        }
+      });
+
+      $("#smartcreate-request").click(async function (event) {
+      
+        try {
+          const accounts = await rpc.getAccounts(web3auth.provider);
+          eoa = accounts;
+          smartAccount = await rpc.getSmartAddress(web3auth.provider, eoa);
+          console.log("Your smart is " + smartAccount);
+          
+          const reqAddr = await rpc.createRequest(
+            web3auth.provider,
+            eoa,
+            document.getElementById("req-bill-type").value,
+            document.getElementById("req-ipfs-hash").value,
+            smartAccount,
+            document.getElementById("req-to-addr").value,
+            document.getElementById("req-asset").value,
+            document.getElementById("req-amount").value);
+          console.log("Request addr: " + reqAddr);
+        } catch (error) {
+          console.error(error.message);
+        }
+      });
+
+      $("#pay-request").click(async function (event) {
+      
+        try {
+          const paymentRes = await rpc.mmPayRequest(web3auth.provider,
+          document.getElementById("payreq-to-addr").value,
+          document.getElementById("payreq-amount").value,
+          document.getElementById("payreq-reqaddress").value);
+
+          console.log("Request payment tx hash: " + paymentRes);
+        } catch (error) {
+        console.error(error.message);
+        }
+
+      });
+
+      $("#smartpay-request").click(async function (event) {
+      
+        try {
+          const accounts = await rpc.getAccounts(web3auth.provider);
+          eoa = accounts;
+          const paymentRes = await rpc.payRequest(web3auth.provider,
+          eoa, 
+          document.getElementById("payreq-to-addr").value,
+          document.getElementById("payreq-amount").value,
+          document.getElementById("payreq-reqaddress").value);
+
+          console.log("Request payment rez: " + paymentRes);
+        } catch (error) {
+        console.error(error.message);
+        }
+
+      });
+    </script>
+  </body>
+</html>
